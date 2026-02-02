@@ -24,6 +24,8 @@ import {
   setAccountRuntime,
   createDefaultRuntimeState,
 } from './runtime.js';
+import { buildChannelConfigSchema } from 'openclaw/plugin-sdk';
+import { LarkConfigSchema } from './config-schema.js';
 
 // ─── Constants ───────────────────────────────────────────────────
 
@@ -501,6 +503,8 @@ export const larkPlugin = {
   },
 
   reload: { configPrefixes: ['channels.lark'] },
+
+  configSchema: buildChannelConfigSchema(LarkConfigSchema),
 
   config: {
     listAccountIds: (cfg: { channels?: { lark?: LarkChannelConfig } }) => listLarkAccountIds(cfg),
