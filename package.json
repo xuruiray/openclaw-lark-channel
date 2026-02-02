@@ -1,0 +1,58 @@
+{
+  "name": "@openclaw/lark",
+  "version": "1.0.0",
+  "description": "OpenClaw Lark (Feishu) channel plugin with guaranteed message delivery",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/**/*.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "openclaw",
+    "lark",
+    "feishu",
+    "channel",
+    "plugin",
+    "messaging",
+    "chatbot"
+  ],
+  "author": "Boyang Wang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/boyangwang/openclaw-lark"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.41.0",
+    "better-sqlite3": "^11.8.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.0.0"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.1.0"
+  }
+}

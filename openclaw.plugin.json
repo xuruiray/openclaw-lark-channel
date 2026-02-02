@@ -1,0 +1,91 @@
+{
+  "id": "lark",
+  "channels": ["lark"],
+  "kind": "channel",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "appId": {
+        "type": "string",
+        "description": "Lark application ID"
+      },
+      "appSecret": {
+        "type": "string",
+        "description": "Lark application secret (prefer appSecretFile for security)"
+      },
+      "appSecretFile": {
+        "type": "string",
+        "description": "Path to file containing the app secret"
+      },
+      "encryptKey": {
+        "type": "string",
+        "description": "Encryption key for webhook events (optional)"
+      },
+      "webhookPort": {
+        "type": "number",
+        "description": "Port for webhook HTTP server",
+        "default": 3000
+      },
+      "enabled": {
+        "type": "boolean",
+        "description": "Enable or disable the Lark channel",
+        "default": true
+      },
+      "dmPolicy": {
+        "type": "string",
+        "enum": ["open", "pairing", "allowlist"],
+        "description": "Direct message security policy",
+        "default": "pairing"
+      },
+      "allowFrom": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "List of allowed Lark user IDs (for allowlist policy)"
+      },
+      "groupPolicy": {
+        "type": "string",
+        "enum": ["open", "allowlist", "deny"],
+        "description": "Group chat security policy",
+        "default": "allowlist"
+      },
+      "groups": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "requireMention": {
+              "type": "boolean",
+              "default": true
+            },
+            "name": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "Group-specific configuration"
+      },
+      "queueDbPath": {
+        "type": "string",
+        "description": "Path to SQLite queue database"
+      },
+      "domain": {
+        "type": "string",
+        "enum": ["lark", "feishu"],
+        "description": "Lark domain (lark for international, feishu for China)",
+        "default": "lark"
+      }
+    }
+  },
+  "channel": {
+    "id": "lark",
+    "label": "Lark",
+    "selectionLabel": "Lark (Feishu)",
+    "detailLabel": "Lark / Feishu",
+    "blurb": "Connect to Lark (Feishu) messaging platform with guaranteed message delivery",
+    "docsPath": "/channels/lark",
+    "order": 15,
+    "aliases": ["feishu"],
+    "systemImage": "message.circle.fill"
+  }
+}
