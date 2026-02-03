@@ -18,7 +18,7 @@ import type {
   LarkCard,
   LarkProbeResult,
   ParsedPostContent,
-  Attachment,
+  ImageAttachment,
 } from './types.js';
 
 // ─── Client Class ────────────────────────────────────────────────
@@ -258,7 +258,7 @@ export class LarkClient {
   /**
    * Download an image from a message
    */
-  async downloadImage(imageKey: string, messageId: string): Promise<Attachment | null> {
+  async downloadImage(imageKey: string, messageId: string): Promise<ImageAttachment | null> {
     try {
       const token = await this.getTenantToken();
       if (!token) return null;

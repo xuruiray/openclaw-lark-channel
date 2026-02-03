@@ -273,18 +273,21 @@ export class WebhookHandler {
       return;
     }
 
-    // Card callback endpoint (separate from message events)
-    if (req.method === 'POST' && req.url === '/webhook/card') {
+    // Card callback endpoint - support both old and new URLs (transition period)
+    if (req.method === 'POST' && (req.url === '/lark/cards' || req.url === '/webhook/card')) {
+      console.log(`[WEBHOOK] Card callback received at ${req.url}`);
       await this.handleCardRequest(req, res);
       return;
     }
 
-    // Only accept POST to /webhook for message events
-    if (req.method !== 'POST' || req.url !== '/webhook') {
+    // Message events endpoint - support both old and new URLs (transition period)
+    const isMessageEndpoint = req.url === '/lark/events' || req.url === '/webhook';
+    if (req.method !== 'POST' || !isMessageEndpoint) {
       res.writeHead(404);
       res.end('Not found');
       return;
     }
+    console.log(`[WEBHOOK] Message event received at ${req.url}`);
 
     // Read body
     const chunks: Buffer[] = [];
@@ -386,13 +389,16 @@ export class WebhookHandler {
    */
   private async handleCardCallback(data: any): Promise<any> {
     try {
+      // DEBUG: Log full payload first
+      console.log(`[WEBHOOK-CARD] Full payload:`, JSON.stringify(data, null, 2));
+
       // Handle both direct event format and wrapped format
       const event = data.event || data;
-      const operator = event.operator || data.open_id ? { open_id: data.open_id } : {};
+      const operator = event.operator || (data.open_id ? { open_id: data.open_id } : {});
       const action = event.action || data.action || {};
       const context = event.context || {};
 
-      const userId = operator?.open_id || data.user_id;
+      const userId = operator?.open_id || data.open_id || data.user_id;
       const chatId = context?.open_chat_id || data.open_chat_id;
       const messageId = context?.open_message_id || data.open_message_id;
 
@@ -403,6 +409,8 @@ export class WebhookHandler {
       const actionValue = action?.value || {};
       const formValue = action?.form_value || {};
       const actionName = actionValue.action || action?.tag || 'unknown';
+      
+      console.log(`[WEBHOOK-CARD] Extracted actionName=${actionName}, formValue=`, JSON.stringify(formValue));
 
       // ID Note skill handling
       if (actionName === 'add_entry' || actionName === 'finish' || actionName === 'cancel' || actionName === 'new_session') {
@@ -486,11 +494,18 @@ export class WebhookHandler {
           const { texts, imageKeys } = this.config.client.parsePostContent(message.content ?? '');
           text = texts.join(' ').trim();
 
-          // Download images
+          // Download images and save to disk
           for (const key of imageKeys) {
             const img = await this.config.client.downloadImage(key, messageId);
-            if (img) {
-              attachments.push(img);
+            if (img && img.content) {
+              // Save image to disk like files
+              const ext = img.mimeType?.includes('png') ? '.png' : '.jpg';
+              const imagePath = this.saveFileAttachment(img.content, img.mimeType, `image_${messageId}_${Date.now()}${ext}`);
+              attachments.push({
+                type: 'image',
+                path: imagePath,
+                mimeType: img.mimeType,
+              });
             }
           }
           break;
@@ -501,8 +516,15 @@ export class WebhookHandler {
             const content = JSON.parse(message.content ?? '{}') as { image_key?: string };
             if (content.image_key) {
               const img = await this.config.client.downloadImage(content.image_key, messageId);
-              if (img) {
-                attachments.push(img);
+              if (img && img.content) {
+                // Save image to disk like files
+                const ext = img.mimeType?.includes('png') ? '.png' : '.jpg';
+                const imagePath = this.saveFileAttachment(img.content, img.mimeType, `image_${messageId}_${Date.now()}${ext}`);
+                attachments.push({
+                  type: 'image',
+                  path: imagePath,
+                  mimeType: img.mimeType,
+                });
               }
             }
           } catch {

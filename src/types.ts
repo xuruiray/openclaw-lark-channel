@@ -254,7 +254,8 @@ export interface LarkTokenCache {
 export interface ImageAttachment {
   type?: 'image';
   mimeType: string;
-  content: string;  // base64
+  content?: string;  // base64 (deprecated - use path instead)
+  path?: string;     // file path (preferred)
 }
 
 /**
