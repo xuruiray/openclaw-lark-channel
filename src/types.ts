@@ -12,6 +12,7 @@ export interface LarkChannelConfig {
   appSecretFile?: string;
   encryptKey?: string;
   webhookPort?: number;
+  webhookBind?: string;
   enabled?: boolean;
   dmPolicy?: 'open' | 'pairing' | 'allowlist';
   allowFrom?: string[];
@@ -41,6 +42,7 @@ export interface ResolvedLarkAccount {
   appSecret: string;
   encryptKey: string;
   webhookPort: number;
+  webhookBind: string;
   domain: 'lark' | 'feishu';
   config: LarkChannelConfig;
   tokenSource: 'config' | 'file' | 'env' | 'none';

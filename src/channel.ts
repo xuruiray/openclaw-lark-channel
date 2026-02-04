@@ -100,6 +100,7 @@ export function resolveLarkAccount(params: {
     appSecret,
     encryptKey: merged.encryptKey ?? process.env.FEISHU_ENCRYPT_KEY ?? '',
     webhookPort: merged.webhookPort ?? DEFAULT_WEBHOOK_PORT,
+    webhookBind: merged.webhookBind ?? '127.0.0.1',
     domain: merged.domain ?? 'lark',
     config: merged,
     tokenSource,
@@ -936,6 +937,7 @@ export const larkPlugin = {
       // Start webhook
       const webhook = new WebhookHandler({
         port: account.webhookPort,
+        bind: account.webhookBind,
         encryptKey: account.encryptKey,
         queue,
         client,
@@ -985,7 +987,7 @@ export const larkPlugin = {
 ║  ♾️  UNLIMITED retries with exponential backoff                   ║
 ║  ⚡ NO MESSAGE LOSS - EVER                                        ║
 ╠═══════════════════════════════════════════════════════════════════╣
-║  Webhook: http://0.0.0.0:${String(account.webhookPort).padEnd(41)}║
+║  Webhook: http://${account.webhookBind}:${String(account.webhookPort).padEnd(37 - account.webhookBind.length)}║
 ║  Queue:   ${queue.path.padEnd(52)}║
 ╚═══════════════════════════════════════════════════════════════════╝
 `);

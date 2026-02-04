@@ -36,6 +36,7 @@ export const LarkConfigSchema = z.object({
   encryptKey: z.string().optional().describe('Encryption key for webhook events'),
   
   webhookPort: z.number().optional().default(3000).describe('Port for webhook HTTP server'),
+  webhookBind: z.string().optional().default('127.0.0.1').describe('Bind address for webhook HTTP server (127.0.0.1 for localhost only, 0.0.0.0 for all interfaces)'),
   
   domain: z.enum(['lark', 'feishu']).optional().default('lark')
     .describe('Lark domain (lark for international, feishu for China)'),

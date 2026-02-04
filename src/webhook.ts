@@ -84,6 +84,7 @@ const ALLOWED_DM_CHAT_ID = 'oc_289754d98cefc623207a174739837c29';
 
 export interface WebhookConfig {
   port: number;
+  bind?: string;
   encryptKey?: string;
   queue: MessageQueue;
   client: LarkClient;
@@ -229,7 +230,8 @@ export class WebhookHandler {
         reject(err);
       });
 
-      this.server.listen(this.config.port, '0.0.0.0', () => {
+      const bindAddr = this.config.bind ?? '127.0.0.1';
+      this.server.listen(this.config.port, bindAddr, () => {
         console.log(`[WEBHOOK] 🚀 Listening on port ${this.config.port}`);
         resolve();
       });
