@@ -518,6 +518,30 @@ export class MessageQueue {
     if (outDeleted.changes > 0 || inDeleted.changes > 0) {
       console.log(`[QUEUE] Cleanup: outbound=${outDeleted.changes}, inbound=${inDeleted.changes}, sent=${sentDeleted.changes}`);
     }
+
+    this.cleanupMediaFiles(cutoff);
+  }
+
+  private cleanupMediaFiles(cutoffMs: number): void {
+    const mediaDir = path.join(process.env.HOME ?? '/root', '.openclaw', 'media', 'lark-inbound');
+    try {
+      if (!fs.existsSync(mediaDir)) return;
+      const files = fs.readdirSync(mediaDir);
+      let deleted = 0;
+      for (const file of files) {
+        const filePath = path.join(mediaDir, file);
+        try {
+          const stat = fs.statSync(filePath);
+          if (stat.mtimeMs < cutoffMs) {
+            fs.unlinkSync(filePath);
+            deleted++;
+          }
+        } catch { /* skip */ }
+      }
+      if (deleted > 0) {
+        console.log(`[QUEUE] Media cleanup: deleted ${deleted} old file(s) from ${mediaDir}`);
+      }
+    } catch { /* ignore */ }
   }
 
   recoverStuck(): void {
@@ -552,19 +576,24 @@ export class MessageQueue {
   }
 }
 
-// Default singleton instance
-let defaultQueue: MessageQueue | null = null;
+const queueRegistry = new Map<string, MessageQueue>();
+const DEFAULT_ID = 'default';
 
-export function getQueue(dbPath?: string): MessageQueue {
-  if (!defaultQueue) {
-    defaultQueue = new MessageQueue(dbPath);
+export function getQueue(dbPath?: string, accountId?: string): MessageQueue {
+  const id = accountId ?? DEFAULT_ID;
+  let queue = queueRegistry.get(id);
+  if (!queue) {
+    queue = new MessageQueue(dbPath);
+    queueRegistry.set(id, queue);
   }
-  return defaultQueue;
+  return queue;
 }
 
-export function closeQueue(): void {
-  if (defaultQueue) {
-    defaultQueue.close();
-    defaultQueue = null;
+export function closeQueue(accountId?: string): void {
+  const id = accountId ?? DEFAULT_ID;
+  const queue = queueRegistry.get(id);
+  if (queue) {
+    queue.close();
+    queueRegistry.delete(id);
   }
 }

@@ -18,6 +18,7 @@ export interface LarkChannelConfig {
   dmAllowlist?: string[];
   allowFrom?: string[];
   groupPolicy?: 'open' | 'allowlist' | 'deny';
+  groupAllowFrom?: string[];
   groups?: Record<string, LarkGroupConfig>;
   queueDbPath?: string;
   domain?: 'lark' | 'feishu';

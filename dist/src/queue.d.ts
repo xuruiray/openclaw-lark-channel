@@ -95,10 +95,11 @@ export declare class MessageQueue {
     markInboundRetry(id: number, errorMessage: string): void;
     getStats(): QueueStats;
     cleanup(): void;
+    private cleanupMediaFiles;
     recoverStuck(): void;
     close(): void;
     get path(): string;
 }
-export declare function getQueue(dbPath?: string): MessageQueue;
-export declare function closeQueue(): void;
+export declare function getQueue(dbPath?: string, accountId?: string): MessageQueue;
+export declare function closeQueue(accountId?: string): void;
 //# sourceMappingURL=queue.d.ts.map

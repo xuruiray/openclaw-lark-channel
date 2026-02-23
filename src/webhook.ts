@@ -21,6 +21,7 @@ import type {
 } from './types.js';
 import type { MessageQueue } from './queue.js';
 import type { LarkClient } from './client.js';
+import { notifyInboundEnqueued } from './channel.js';
 
 // ─── Encryption ──────────────────────────────────────────────────
 
@@ -89,6 +90,7 @@ export interface WebhookConfig {
   sessionKeyPrefix?: string;
   groupRequireMention?: boolean;
   groupAllowlist?: Set<string>;
+  groupAllowFrom?: Set<string>;
   dmAllowFrom?: Set<string>;
 }
 
@@ -629,16 +631,22 @@ export class WebhookHandler {
       if (message?.chat_type === 'group') {
         const mentions = message.mentions ?? [];
 
-        // Check allowlist
         if (this.config.groupAllowlist && !this.config.groupAllowlist.has(chatId)) {
-          console.log(`[WEBHOOK] Ignoring group ${chatId} (not in allowlist)`);
+          console.log(`[WEBHOOK] Ignoring group ${chatId} (not in group allowlist)`);
           return;
         }
 
-        // Remove mention markers from text
+        // Check sender identity in group (groupAllowFrom)
+        if (this.config.groupAllowFrom && this.config.groupAllowFrom.size > 0) {
+          const senderOpenId = event.sender?.sender_id?.open_id ?? '';
+          if (!this.config.groupAllowFrom.has('*') && !this.config.groupAllowFrom.has(senderOpenId)) {
+            console.log(`[WEBHOOK] 🚫 Group sender blocked: sender=${senderOpenId} group=${chatId} (not in groupAllowFrom)`);
+            return;
+          }
+        }
+
         text = text.replace(/@_user_\d+\s*/g, '').trim();
 
-        // Check if we should respond
         const requireMention = this.config.groupRequireMention ?? true;
         if (attachments.length === 0 && !shouldRespondInGroup(text, mentions, requireMention)) {
           return;
@@ -664,6 +672,7 @@ export class WebhookHandler {
 
       if (result.enqueued) {
         console.log(`[WEBHOOK] ✅ Queued message ${messageId}`);
+        notifyInboundEnqueued();
       } else {
         console.log(`[WEBHOOK] ⏭️ Skipped: ${result.reason}`);
       }

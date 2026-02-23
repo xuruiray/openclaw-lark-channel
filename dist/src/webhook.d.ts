@@ -31,6 +31,7 @@ export interface WebhookConfig {
     sessionKeyPrefix?: string;
     groupRequireMention?: boolean;
     groupAllowlist?: Set<string>;
+    groupAllowFrom?: Set<string>;
     dmAllowFrom?: Set<string>;
 }
 export declare class WebhookHandler {

@@ -22,6 +22,7 @@ export declare function listLarkAccountIds(cfg: {
         lark?: LarkChannelConfig;
     };
 }): string[];
+export declare function notifyInboundEnqueued(): void;
 interface ChannelPluginContext {
     cfg: {
         channels?: {

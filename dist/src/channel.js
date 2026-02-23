@@ -8,6 +8,7 @@
  * - Interactive cards with rich formatting
  * - Image upload/download support
  */
+import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -22,7 +23,6 @@ import { LarkConfigSchema } from './config-schema.js';
 // ─── Constants ───────────────────────────────────────────────────
 const DEFAULT_ACCOUNT_ID = 'default';
 const DEFAULT_WEBHOOK_PORT = 3000;
-const CONSUMER_INTERVAL_MS = 500;
 // ─── Config Helpers ──────────────────────────────────────────────
 function resolveUserPath(p) {
     return p.replace(/^~/, process.env.HOME ?? '/root');
@@ -106,6 +106,8 @@ const larkChannelMeta = {
     quickstartAllowFrom: true,
 };
 // ─── Consumer Functions ──────────────────────────────────────────
+const CONSUMER_FALLBACK_INTERVAL_MS = 5000;
+const consumerEvents = new EventEmitter();
 let inboundConsumerRunning = false;
 let outboundConsumerRunning = false;
 let inboundInterval = null;
@@ -358,17 +360,7 @@ async function processInboundQueue(queue, _gatewayToken, _gatewayPort, _agentId)
             const client = getLarkClient();
             console.log(`[INBOUND] Starting dispatch for message: "${msg.message_text.substring(0, 50)}..." | images: ${images.length}`);
             console.log(`[INBOUND] Context: SessionKey=${route.sessionKey}, ChatId=${msg.chat_id}, Surface=${ctx.Surface}, OriginatingChannel=${ctx.OriginatingChannel}`);
-            // Write debug to file
-            const fs = require('fs');
-            const debugLog = (line) => {
-                const ts = new Date().toISOString();
-                fs.appendFileSync('/tmp/lark-dispatch.log', `${ts} ${line}\n`);
-            };
-            debugLog(`=== Processing message #${msg.id}: "${msg.message_text.substring(0, 50)}..."`);
-            debugLog(`Context: SessionKey=${route.sessionKey}, Surface=${ctx.Surface}, OriginatingChannel=${ctx.OriginatingChannel}`);
-            // Use the dispatch system - SAME AS TELEGRAM
-            // Add a timeout to prevent hanging indefinitely
-            const DISPATCH_TIMEOUT_MS = 300_000; // 5 minutes
+            const DISPATCH_TIMEOUT_MS = 300_000;
             let deliverCallCount = 0;
             let lastDeliveryKind = '';
             const dispatchPromise = pluginRuntime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
@@ -378,64 +370,43 @@ async function processInboundQueue(queue, _gatewayToken, _gatewayPort, _agentId)
                     deliver: async (payload, info) => {
                         deliverCallCount++;
                         lastDeliveryKind = info.kind;
-                        debugLog(`deliver() called #${deliverCallCount}: kind=${info.kind}, hasText=${!!payload.text}, textLen=${payload.text?.length ?? 0}`);
                         console.log(`[DISPATCH] deliver() called #${deliverCallCount}: kind=${info.kind}, hasText=${!!payload.text}, textLen=${payload.text?.length ?? 0}, hasMedia=${!!payload.mediaUrl}`);
-                        // Process ALL kinds now for debugging
                         const text = payload.text?.trim();
                         if (!text) {
-                            debugLog(`Skipping empty payload for kind=${info.kind}`);
                             console.log(`[DISPATCH] Skipping empty payload for kind=${info.kind}`);
                             return;
                         }
-                        debugLog(`Delivering ${info.kind}: ${text.length} chars to ${msg.chat_id}`);
                         console.log(`[DISPATCH] Delivering ${info.kind}: ${text.length} chars to ${msg.chat_id}`);
-                        // Send to Lark
                         await sendToLark(client, msg.chat_id, text, route.sessionKey);
-                        debugLog(`✅ Sent ${info.kind} to Lark`);
                         console.log(`[DISPATCH] ✅ Sent ${info.kind} to Lark`);
                     },
                     onError: (err, info) => {
-                        debugLog(`ERROR ${info.kind}: ${err.message}`);
                         console.error(`[DISPATCH] ${info.kind} error:`, err.message);
-                        // Log stack trace for debugging
                         if (err.stack) {
-                            debugLog(`Stack: ${err.stack}`);
                             console.error(`[DISPATCH] Stack:`, err.stack);
                         }
                     },
                     onSkip: (_payload, info) => {
-                        debugLog(`onSkip: reason=${info.reason}`);
                         console.log(`[DISPATCH] onSkip: reason=${info.reason}`);
                     },
                     onReplyStart: () => {
-                        debugLog(`onReplyStart called`);
                         console.log(`[DISPATCH] onReplyStart called`);
                     },
                 },
                 replyOptions: {
-                    // Enable block streaming for verbose mode (tool calls, thinking, etc.)
                     disableBlockStreaming: false,
                     images: images.length > 0 ? images : undefined,
                 },
             });
-            // Add timeout to prevent getting stuck
             const timeoutPromise = new Promise((_, reject) => {
                 setTimeout(() => reject(new Error('Dispatch timeout after 5 minutes')), DISPATCH_TIMEOUT_MS);
             });
             const dispatchResult = await Promise.race([dispatchPromise, timeoutPromise]);
-            debugLog(`✅ Completed #${msg.id} | deliverCalls=${deliverCallCount} | lastKind=${lastDeliveryKind} | dispatchResult=${JSON.stringify(dispatchResult)}`);
             console.log(`[INBOUND] ✅ Completed #${msg.id} | deliverCalls=${deliverCallCount} | lastKind=${lastDeliveryKind} | dispatchResult=${JSON.stringify(dispatchResult)}`);
             queue.markInboundCompleted(msg.id, 'delivered');
         }
         catch (err) {
             const error = err;
-            // Log to file in catch too
-            const fs = require('fs');
-            const ts = new Date().toISOString();
-            fs.appendFileSync('/tmp/lark-dispatch.log', `${ts} ❌ Failed #${msg.id}: ${error.message}\n`);
-            if (error.stack) {
-                fs.appendFileSync('/tmp/lark-dispatch.log', `${ts} Stack: ${error.stack}\n`);
-            }
             console.error(`[INBOUND] ❌ Failed #${msg.id}:`, error.message);
             if (error.stack) {
                 console.error(`[INBOUND] Stack:`, error.stack);
@@ -469,23 +440,32 @@ async function processOutboundQueue(queue, client) {
         }
     }
 }
+export function notifyInboundEnqueued() {
+    consumerEvents.emit('inbound');
+}
 function startConsumers(queue, client, gatewayToken, gatewayPort, agentId) {
     if (!inboundConsumerRunning) {
         inboundConsumerRunning = true;
         console.log('[CONSUMER] 🚀 Starting INBOUND consumer (Lark → Gateway)');
-        inboundInterval = setInterval(() => processInboundQueue(queue, gatewayToken, gatewayPort, agentId), CONSUMER_INTERVAL_MS);
+        consumerEvents.on('inbound', () => {
+            if (inboundConsumerRunning) {
+                processInboundQueue(queue, gatewayToken, gatewayPort, agentId);
+            }
+        });
+        inboundInterval = setInterval(() => processInboundQueue(queue, gatewayToken, gatewayPort, agentId), CONSUMER_FALLBACK_INTERVAL_MS);
         processInboundQueue(queue, gatewayToken, gatewayPort, agentId);
     }
     if (!outboundConsumerRunning) {
         outboundConsumerRunning = true;
         console.log('[CONSUMER] 🚀 Starting OUTBOUND consumer (Gateway → Lark)');
-        outboundInterval = setInterval(() => processOutboundQueue(queue, client), CONSUMER_INTERVAL_MS);
+        outboundInterval = setInterval(() => processOutboundQueue(queue, client), CONSUMER_FALLBACK_INTERVAL_MS);
         processOutboundQueue(queue, client);
     }
 }
 function stopConsumers() {
     inboundConsumerRunning = false;
     outboundConsumerRunning = false;
+    consumerEvents.removeAllListeners('inbound');
     if (inboundInterval) {
         clearInterval(inboundInterval);
         inboundInterval = null;
@@ -517,6 +497,15 @@ async function sendToLarkWithRetry(client, chatId, content, sessionKey) {
     if (msgType === 'skip') {
         return { skipped: true };
     }
+    const NON_RETRYABLE_CODES = new Set([
+        99991400, // content too long
+        99991401, // invalid content
+        230001, // permission denied
+        230002, // bot not in chat
+        230006, // user not in chat
+        230014, // message recall timeout
+        232009, // invalid image key
+    ]);
     let lastError;
     for (let attempt = 1; attempt <= SEND_MAX_RETRIES; attempt++) {
         try {
@@ -525,7 +514,6 @@ async function sendToLarkWithRetry(client, chatId, content, sessionKey) {
                 result = await client.sendText(chatId, content);
             }
             else {
-                // Interactive card
                 const card = buildCard({ text: content, sessionKey });
                 result = await client.sendCard(chatId, card);
             }
@@ -534,13 +522,17 @@ async function sendToLarkWithRetry(client, chatId, content, sessionKey) {
                 return { messageId: result.messageId };
             }
             lastError = result.error ?? 'Unknown error';
+            const codeMatch = lastError.match(/\b(\d{5,})\b/);
+            if (codeMatch && NON_RETRYABLE_CODES.has(Number(codeMatch[1]))) {
+                console.error(`[LARK-SEND] ❌ Non-retryable error (code ${codeMatch[1]}): ${lastError}`);
+                return { error: lastError };
+            }
             console.warn(`[LARK-SEND] Attempt ${attempt}/${SEND_MAX_RETRIES} failed: ${lastError}`);
         }
         catch (err) {
             lastError = err.message;
             console.warn(`[LARK-SEND] Attempt ${attempt}/${SEND_MAX_RETRIES} threw: ${lastError}`);
         }
-        // Exponential backoff before retry (cap at 120 minutes)
         if (attempt < SEND_MAX_RETRIES) {
             const backoffMs = calculateSendBackoff(attempt);
             const backoffFormatted = backoffMs >= 60000
@@ -796,9 +788,11 @@ export const larkPlugin = {
             const groupAllowlist = account.config.groups
                 ? new Set(Object.keys(account.config.groups))
                 : undefined;
-            // Build DM allowFrom from config
+            // Build DM allowFrom and group allowFrom from config
             const allowFromArr = account.config.allowFrom ?? [];
             const dmAllowFrom = allowFromArr.length > 0 ? new Set(allowFromArr) : undefined;
+            const groupAllowFromArr = account.config.groupAllowFrom ?? [];
+            const groupAllowFrom = groupAllowFromArr.length > 0 ? new Set(groupAllowFromArr) : undefined;
             // Start webhook
             const webhook = new WebhookHandler({
                 port: account.webhookPort,
@@ -809,6 +803,7 @@ export const larkPlugin = {
                 sessionKeyPrefix: 'lark',
                 groupRequireMention: true,
                 groupAllowlist,
+                groupAllowFrom,
                 dmAllowFrom,
             });
             await webhook.start();

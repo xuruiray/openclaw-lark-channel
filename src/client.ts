@@ -486,23 +486,18 @@ export class LarkClient {
   }
 }
 
-// Default singleton
-let defaultClient: LarkClient | null = null;
+const clientRegistry = new Map<string, LarkClient>();
+const DEFAULT_ID = 'default';
 
-export function getLarkClient(params?: {
-  appId: string;
-  appSecret: string;
-  domain?: 'lark' | 'feishu';
-}): LarkClient {
-  if (!defaultClient && params) {
-    defaultClient = new LarkClient(params);
+export function getLarkClient(accountId?: string): LarkClient {
+  const id = accountId ?? DEFAULT_ID;
+  const client = clientRegistry.get(id);
+  if (!client) {
+    throw new Error(`LarkClient not initialized for account "${id}". Call setLarkClient first.`);
   }
-  if (!defaultClient) {
-    throw new Error('LarkClient not initialized. Call getLarkClient with params first.');
-  }
-  return defaultClient;
+  return client;
 }
 
-export function setLarkClient(client: LarkClient): void {
-  defaultClient = client;
+export function setLarkClient(client: LarkClient, accountId?: string): void {
+  clientRegistry.set(accountId ?? DEFAULT_ID, client);
 }

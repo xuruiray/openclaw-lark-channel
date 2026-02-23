@@ -379,6 +379,31 @@ export class MessageQueue {
         if (outDeleted.changes > 0 || inDeleted.changes > 0) {
             console.log(`[QUEUE] Cleanup: outbound=${outDeleted.changes}, inbound=${inDeleted.changes}, sent=${sentDeleted.changes}`);
         }
+        this.cleanupMediaFiles(cutoff);
+    }
+    cleanupMediaFiles(cutoffMs) {
+        const mediaDir = path.join(process.env.HOME ?? '/root', '.openclaw', 'media', 'lark-inbound');
+        try {
+            if (!fs.existsSync(mediaDir))
+                return;
+            const files = fs.readdirSync(mediaDir);
+            let deleted = 0;
+            for (const file of files) {
+                const filePath = path.join(mediaDir, file);
+                try {
+                    const stat = fs.statSync(filePath);
+                    if (stat.mtimeMs < cutoffMs) {
+                        fs.unlinkSync(filePath);
+                        deleted++;
+                    }
+                }
+                catch { /* skip */ }
+            }
+            if (deleted > 0) {
+                console.log(`[QUEUE] Media cleanup: deleted ${deleted} old file(s) from ${mediaDir}`);
+            }
+        }
+        catch { /* ignore */ }
     }
     recoverStuck() {
         const fiveMinAgo = Date.now() - 5 * 60 * 1000;
@@ -406,18 +431,23 @@ export class MessageQueue {
         return this.dbPath;
     }
 }
-// Default singleton instance
-let defaultQueue = null;
-export function getQueue(dbPath) {
-    if (!defaultQueue) {
-        defaultQueue = new MessageQueue(dbPath);
+const queueRegistry = new Map();
+const DEFAULT_ID = 'default';
+export function getQueue(dbPath, accountId) {
+    const id = accountId ?? DEFAULT_ID;
+    let queue = queueRegistry.get(id);
+    if (!queue) {
+        queue = new MessageQueue(dbPath);
+        queueRegistry.set(id, queue);
     }
-    return defaultQueue;
+    return queue;
 }
-export function closeQueue() {
-    if (defaultQueue) {
-        defaultQueue.close();
-        defaultQueue = null;
+export function closeQueue(accountId) {
+    const id = accountId ?? DEFAULT_ID;
+    const queue = queueRegistry.get(id);
+    if (queue) {
+        queue.close();
+        queueRegistry.delete(id);
     }
 }
 //# sourceMappingURL=queue.js.map

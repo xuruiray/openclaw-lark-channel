@@ -393,18 +393,17 @@ export class LarkClient {
         return this.sdk;
     }
 }
-// Default singleton
-let defaultClient = null;
-export function getLarkClient(params) {
-    if (!defaultClient && params) {
-        defaultClient = new LarkClient(params);
+const clientRegistry = new Map();
+const DEFAULT_ID = 'default';
+export function getLarkClient(accountId) {
+    const id = accountId ?? DEFAULT_ID;
+    const client = clientRegistry.get(id);
+    if (!client) {
+        throw new Error(`LarkClient not initialized for account "${id}". Call setLarkClient first.`);
     }
-    if (!defaultClient) {
-        throw new Error('LarkClient not initialized. Call getLarkClient with params first.');
-    }
-    return defaultClient;
+    return client;
 }
-export function setLarkClient(client) {
-    defaultClient = client;
+export function setLarkClient(client, accountId) {
+    clientRegistry.set(accountId ?? DEFAULT_ID, client);
 }
 //# sourceMappingURL=client.js.map

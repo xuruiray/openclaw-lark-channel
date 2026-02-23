@@ -77,10 +77,6 @@ export declare class LarkClient {
     parsePostContent(content: string | object): ParsedPostContent;
     get client(): LarkSDK.Client;
 }
-export declare function getLarkClient(params?: {
-    appId: string;
-    appSecret: string;
-    domain?: 'lark' | 'feishu';
-}): LarkClient;
-export declare function setLarkClient(client: LarkClient): void;
+export declare function getLarkClient(accountId?: string): LarkClient;
+export declare function setLarkClient(client: LarkClient, accountId?: string): void;
 //# sourceMappingURL=client.d.ts.map
