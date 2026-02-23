@@ -110,6 +110,7 @@ const CONSUMER_FALLBACK_INTERVAL_MS = 5000;
 const consumerEvents = new EventEmitter();
 let inboundConsumerRunning = false;
 let outboundConsumerRunning = false;
+let inboundProcessing = false;
 let inboundInterval = null;
 let outboundInterval = null;
 // ⚡ CRITICAL FIX: Use dispatchReplyWithBufferedBlockDispatcher like Telegram
@@ -247,8 +248,17 @@ function parseAttachmentsForAgent(attachmentsJson, log = { info: console.log, wa
     return results;
 }
 async function processInboundQueue(queue, _gatewayToken, _gatewayPort, _agentId) {
-    if (!inboundConsumerRunning)
+    if (!inboundConsumerRunning || inboundProcessing)
         return;
+    inboundProcessing = true;
+    try {
+        await processInboundQueueInner(queue);
+    }
+    finally {
+        inboundProcessing = false;
+    }
+}
+async function processInboundQueueInner(queue) {
     const messages = queue.dequeueInbound(3);
     for (const msg of messages) {
         queue.markInboundProcessing(msg.id);
@@ -398,10 +408,13 @@ async function processInboundQueue(queue, _gatewayToken, _gatewayPort, _agentId)
                     images: images.length > 0 ? images : undefined,
                 },
             });
+            let timeoutHandle;
             const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Dispatch timeout after 5 minutes')), DISPATCH_TIMEOUT_MS);
+                timeoutHandle = setTimeout(() => reject(new Error('Dispatch timeout after 5 minutes')), DISPATCH_TIMEOUT_MS);
             });
-            const dispatchResult = await Promise.race([dispatchPromise, timeoutPromise]);
+            const dispatchResult = await Promise.race([dispatchPromise, timeoutPromise]).finally(() => {
+                clearTimeout(timeoutHandle);
+            });
             console.log(`[INBOUND] ✅ Completed #${msg.id} | deliverCalls=${deliverCallCount} | lastKind=${lastDeliveryKind} | dispatchResult=${JSON.stringify(dispatchResult)}`);
             queue.markInboundCompleted(msg.id, 'delivered');
         }
@@ -639,11 +652,19 @@ export const larkPlugin = {
     outbound: {
         deliveryMode: 'direct',
         chunker: (text, limit) => {
-            // Simple chunker - split by newlines first, then by length
             const chunks = [];
             let current = '';
             for (const line of text.split('\n')) {
-                if (current.length + line.length + 1 > limit) {
+                if (line.length > limit) {
+                    if (current) {
+                        chunks.push(current);
+                        current = '';
+                    }
+                    for (let i = 0; i < line.length; i += limit) {
+                        chunks.push(line.slice(i, i + limit));
+                    }
+                }
+                else if (current.length + line.length + 1 > limit) {
                     if (current)
                         chunks.push(current);
                     current = line;
@@ -772,7 +793,7 @@ export const larkPlugin = {
                 appSecret: account.appSecret,
                 domain: account.domain,
             });
-            setLarkClient(client);
+            setLarkClient(client, account.accountId);
             // Probe
             const probe = await client.probe();
             if (probe.ok) {

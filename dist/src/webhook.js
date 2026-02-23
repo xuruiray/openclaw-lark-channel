@@ -319,9 +319,6 @@ export class WebhookHandler {
      */
     async handleCardCallback(data) {
         try {
-            // DEBUG: Log full payload first
-            console.log(`[WEBHOOK-CARD] Full payload:`, JSON.stringify(data, null, 2));
-            // Handle both direct event format and wrapped format
             const event = data.event || data;
             const operator = event.operator || (data.open_id ? { open_id: data.open_id } : {});
             const action = event.action || data.action || {};
@@ -329,13 +326,10 @@ export class WebhookHandler {
             const userId = operator?.open_id || data.open_id || data.user_id;
             const chatId = context?.open_chat_id || data.open_chat_id;
             const messageId = context?.open_message_id || data.open_message_id;
-            console.log(`[WEBHOOK-CARD] Callback: user=${userId}, chat=${chatId}`);
-            console.log(`[WEBHOOK-CARD] Action:`, JSON.stringify(action, null, 2));
-            // Extract action info
             const actionValue = action?.value || {};
             const formValue = action?.form_value || {};
             const actionName = actionValue.action || action?.tag || 'unknown';
-            console.log(`[WEBHOOK-CARD] Extracted actionName=${actionName}, formValue=`, JSON.stringify(formValue));
+            console.log(`[WEBHOOK-CARD] action=${actionName} user=${userId} chat=${chatId}`);
             // ID Note skill handling
             if (actionName === 'add_entry' || actionName === 'finish' || actionName === 'cancel' || actionName === 'new_session') {
                 // Call idnote skill handler
