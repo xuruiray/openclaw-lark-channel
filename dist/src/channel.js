@@ -796,6 +796,9 @@ export const larkPlugin = {
             const groupAllowlist = account.config.groups
                 ? new Set(Object.keys(account.config.groups))
                 : undefined;
+            // Build DM allowFrom from config
+            const allowFromArr = account.config.allowFrom ?? [];
+            const dmAllowFrom = allowFromArr.length > 0 ? new Set(allowFromArr) : undefined;
             // Start webhook
             const webhook = new WebhookHandler({
                 port: account.webhookPort,
@@ -806,6 +809,7 @@ export const larkPlugin = {
                 sessionKeyPrefix: 'lark',
                 groupRequireMention: true,
                 groupAllowlist,
+                dmAllowFrom,
             });
             await webhook.start();
             // Get gateway config
