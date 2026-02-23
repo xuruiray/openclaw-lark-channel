@@ -965,6 +965,10 @@ export const larkPlugin = {
         ? new Set(Object.keys(account.config.groups))
         : undefined;
 
+      // Build DM allowlist from config (supports both open_id and chat_id)
+      const allowFromArr: string[] = account.config.allowFrom ?? account.config.dmAllowlist ?? [];
+      const dmAllowlist = allowFromArr.length > 0 ? new Set(allowFromArr) : undefined;
+
       // Start webhook
       const webhook = new WebhookHandler({
         port: account.webhookPort,
@@ -975,6 +979,7 @@ export const larkPlugin = {
         sessionKeyPrefix: 'lark',
         groupRequireMention: true,
         groupAllowlist,
+        dmAllowlist,
       });
 
       await webhook.start();

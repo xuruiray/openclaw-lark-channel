@@ -12,6 +12,7 @@ export interface LarkChannelConfig {
     webhookBind?: string;
     enabled?: boolean;
     dmPolicy?: 'open' | 'pairing' | 'allowlist';
+    dmAllowlist?: string[];
     allowFrom?: string[];
     groupPolicy?: 'open' | 'allowlist' | 'deny';
     groups?: Record<string, LarkGroupConfig>;

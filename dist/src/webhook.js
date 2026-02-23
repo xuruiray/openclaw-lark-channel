@@ -51,10 +51,6 @@ export function shouldRespondInGroup(text, mentions, requireMention) {
         return true;
     return false;
 }
-// ─── Webhook Handler ─────────────────────────────────────────────
-// ⚠️ HARDCODED: Only Boyang's chat ID is allowed for DMs
-// Per Boyang's explicit instruction: "just allow me and only me. Hard code."
-const ALLOWED_DM_CHAT_ID = 'oc_289754d98cefc623207a174739837c29';
 export class WebhookHandler {
     config;
     server = null;
@@ -514,15 +510,12 @@ export class WebhookHandler {
             if (!text && attachments.length === 0) {
                 return;
             }
-            // DM filtering (non-group chats)
-            if (message?.chat_type !== 'group') {
-                // ⚠️ HARDCODED: Only allow Boyang's chat ID
-                // Other DMs are silently ignored for security
-                const allowed = this.config.dmAllowlist
-                    ? this.config.dmAllowlist.has(chatId)
-                    : chatId === ALLOWED_DM_CHAT_ID;
+            // DM filtering (non-group chats) — match by chat_id OR sender open_id
+            if (message?.chat_type !== 'group' && this.config.dmAllowlist && this.config.dmAllowlist.size > 0) {
+                const senderOpenId = event.sender?.sender_id?.open_id || '';
+                const allowed = this.config.dmAllowlist.has(chatId) || this.config.dmAllowlist.has(senderOpenId);
                 if (!allowed) {
-                    console.log(`[WEBHOOK] 🚫 Ignoring DM from ${chatId} (not in allowlist)`);
+                    console.log(`[WEBHOOK] 🚫 Ignoring DM from chat=${chatId} sender=${senderOpenId} (not in allowlist)`);
                     return;
                 }
             }
