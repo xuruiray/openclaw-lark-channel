@@ -658,7 +658,8 @@ export class WebhookHandler {
       // We don't generate it here because the format depends on config (dmScope, identityLinks)
       // The consumer will use chat_id to compute the correct session key at processing time
       // This placeholder is only for queue schema compatibility
-      const sessionKey = `lark:${chatId}`;  // Placeholder - consumer ignores this
+      const senderOpenId = event.sender?.sender_id?.open_id || '';
+      const sessionKey = `lark:${chatId}:${senderOpenId}`;
       const messageText = text || '[User sent an image]';
 
       // ⚡ PERSIST IMMEDIATELY - no message loss

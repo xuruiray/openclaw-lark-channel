@@ -396,8 +396,8 @@ async function processInboundQueue(
         ChatType: chatType,
         CommandAuthorized: true,
         MessageSid: msg.message_id,
-        SenderId: msg.chat_id,
-        From: msg.chat_id,
+        SenderId: (msg.session_key || '').split(':')[2] || msg.chat_id,
+        From: (msg.session_key || '').split(':')[2] || msg.chat_id,
         // ⚡ CRITICAL: Include both images AND files in MediaPath/MediaPaths
         // This enables the media understanding system to process images with vision models
         // Images are saved to disk by the webhook handler and paths are stored in attachments
@@ -996,17 +996,22 @@ export const larkPlugin = {
         consumersRunning: true,
       });
 
-      // Handle abort signal
-      abortSignal?.addEventListener('abort', () => {
-        log?.info(`[${account.accountId}] Stopping Lark channel`);
-        webhook.stop();
-        stopConsumers();
-        closeQueue();
-        setAccountRuntime(account.accountId, {
-          running: false,
-          lastStopAt: Date.now(),
-          webhookServer: null,
-          consumersRunning: false,
+      // Stay alive until abort signal fires (prevents gateway auto-restart cycle)
+      await new Promise<void>((resolve) => {
+        if (!abortSignal) return;
+        if (abortSignal.aborted) { resolve(); return; }
+        abortSignal.addEventListener('abort', () => {
+          log?.info(`[${account.accountId}] Stopping Lark channel`);
+          webhook.stop();
+          stopConsumers();
+          closeQueue();
+          setAccountRuntime(account.accountId, {
+            running: false,
+            lastStopAt: Date.now(),
+            webhookServer: null,
+            consumersRunning: false,
+          });
+          resolve();
         });
       });
 
