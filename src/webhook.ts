@@ -89,6 +89,7 @@ export interface WebhookConfig {
   sessionKeyPrefix?: string;
   groupRequireMention?: boolean;
   groupAllowlist?: Set<string>;
+  dmAllowFrom?: Set<string>;
 }
 
 export class WebhookHandler {
@@ -613,6 +614,15 @@ export class WebhookHandler {
       // Skip empty messages
       if (!text && attachments.length === 0) {
         return;
+      }
+
+      // DM allowFrom check (uses sender open_id, enforced by plugin since gateway doesn't auto-check)
+      if (message?.chat_type !== 'group' && this.config.dmAllowFrom && this.config.dmAllowFrom.size > 0) {
+        const senderOpenId = event.sender?.sender_id?.open_id ?? '';
+        if (!this.config.dmAllowFrom.has('*') && !this.config.dmAllowFrom.has(senderOpenId)) {
+          console.log(`[WEBHOOK] 🚫 DM blocked: sender=${senderOpenId} chat=${chatId} (not in allowFrom)`);
+          return;
+        }
       }
 
       // Group chat filtering
