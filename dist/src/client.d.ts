@@ -23,6 +23,16 @@ export declare class LarkClient {
     });
     getTenantToken(): Promise<string | null>;
     probe(timeoutMs?: number): Promise<LarkProbeResult>;
+    getMessage(messageId: string): Promise<{
+        msg_type?: string;
+        body?: {
+            content?: string;
+        };
+        sender?: {
+            id?: string;
+            sender_type?: string;
+        };
+    } | null>;
     /**
      * Send a text message
      */

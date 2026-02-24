@@ -140,7 +140,7 @@ export interface LarkMessageEvent {
     create_time?: string;
     chat_id?: string;
     chat_type?: 'p2p' | 'group';
-    message_type?: 'text' | 'post' | 'image' | 'file' | 'audio' | 'media' | 'sticker';
+    message_type?: 'text' | 'post' | 'image' | 'file' | 'audio' | 'media' | 'sticker' | 'merge_forward';
     content?: string;
     mentions?: LarkMention[];
   };

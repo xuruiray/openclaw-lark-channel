@@ -105,6 +105,17 @@ export class LarkClient {
             return { ok: false, error: e.message, elapsedMs: Date.now() - start };
         }
     }
+    // ─── Message Reading ───────────────────────────────────────────
+    async getMessage(messageId) {
+        try {
+            const res = await this.sdk.im.v1.message.get({ path: { message_id: messageId } });
+            return (res?.data?.items?.[0] ?? res?.data) ?? null;
+        }
+        catch (e) {
+            console.error(`[LARK-MSG] Failed to get message ${messageId}:`, e.message);
+            return null;
+        }
+    }
     // ─── Message Sending ───────────────────────────────────────────
     /**
      * Send a text message

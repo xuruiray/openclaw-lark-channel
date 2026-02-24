@@ -599,8 +599,41 @@ export class WebhookHandler {
           break;
         }
 
+        case 'merge_forward': {
+          try {
+            const content = JSON.parse(message.content ?? '{}') as {
+              message_ids?: string[];
+            };
+            const ids = content.message_ids ?? [];
+            if (ids.length === 0) {
+              text = '[User forwarded messages (empty)]';
+              break;
+            }
+            const parts: string[] = [];
+            for (const id of ids.slice(0, 20)) {
+              const msg = await this.config.client.getMessage(id);
+              if (!msg) { parts.push(`[message ${id}: fetch failed]`); continue; }
+              const type = msg.msg_type ?? 'unknown';
+              const body = msg.body?.content ?? '';
+              if (type === 'text') {
+                try { parts.push(JSON.parse(body).text ?? body); } catch { parts.push(body); }
+              } else if (type === 'post') {
+                const parsed = this.config.client.parsePostContent(body);
+                parts.push(parsed.texts.join(' '));
+              } else {
+                parts.push(`[${type} message]`);
+              }
+            }
+            const truncNote = ids.length > 20 ? `\n... and ${ids.length - 20} more messages` : '';
+            text = `[Forwarded ${ids.length} messages]\n${parts.join('\n')}${truncNote}`;
+          } catch (e) {
+            console.error('[WEBHOOK] merge_forward parse error:', (e as Error).message);
+            text = '[User forwarded messages (parse error)]';
+          }
+          break;
+        }
+
         default:
-          // Log unsupported message types for debugging
           console.log(`[WEBHOOK] Unsupported message type: ${messageType}`);
           return;
       }

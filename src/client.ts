@@ -155,6 +155,22 @@ export class LarkClient {
     }
   }
 
+  // ─── Message Reading ───────────────────────────────────────────
+
+  async getMessage(messageId: string): Promise<{
+    msg_type?: string;
+    body?: { content?: string };
+    sender?: { id?: string; sender_type?: string };
+  } | null> {
+    try {
+      const res = await this.sdk.im.v1.message.get({ path: { message_id: messageId } });
+      return (res?.data?.items?.[0] ?? res?.data) as any ?? null;
+    } catch (e) {
+      console.error(`[LARK-MSG] Failed to get message ${messageId}:`, (e as Error).message);
+      return null;
+    }
+  }
+
   // ─── Message Sending ───────────────────────────────────────────
 
   /**
