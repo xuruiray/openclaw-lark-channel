@@ -222,7 +222,7 @@ function parseAttachmentsForAgent(
 ): Array<AttachmentForAgent> {
   if (!attachmentsJson) return [];
 
-  let attachments: Array<{ mimeType: string; content: string; fileName?: string }>;
+  let attachments: Array<{ type?: string; mimeType: string; content?: string; path?: string; fileName?: string }>;
   try {
     attachments = JSON.parse(attachmentsJson);
   } catch (e) {
@@ -237,8 +237,23 @@ function parseAttachmentsForAgent(
   const results: Array<AttachmentForAgent> = [];
 
   for (const [idx, att] of attachments.entries()) {
-    if (!att || typeof att.content !== 'string') {
-      log.warn?.(`[ATTACHMENT] Skipping attachment ${idx + 1}: invalid content`);
+    if (!att) continue;
+
+    // File attachments saved to disk by webhook (have path, no base64 content)
+    if (att.type === 'file' && typeof att.path === 'string') {
+      const mime = (att.mimeType ?? 'application/octet-stream').toLowerCase();
+      log.info(`[ATTACHMENT] File on disk ${idx + 1}: ${mime} → ${att.path}`);
+      results.push({
+        type: 'file' as const,
+        path: att.path,
+        mimeType: mime,
+        fileName: att.fileName,
+      });
+      continue;
+    }
+
+    if (typeof att.content !== 'string') {
+      log.warn?.(`[ATTACHMENT] Skipping attachment ${idx + 1}: no content or path`);
       continue;
     }
 
