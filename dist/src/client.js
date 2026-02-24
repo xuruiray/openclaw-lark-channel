@@ -109,7 +109,12 @@ export class LarkClient {
     async getMessage(messageId) {
         try {
             const res = await this.sdk.im.v1.message.get({ path: { message_id: messageId } });
-            return (res?.data?.items?.[0] ?? res?.data) ?? null;
+            const items = res?.data?.items ?? [];
+            if (items.length === 0)
+                return null;
+            const parent = items[0];
+            const children = items.slice(1).filter((item) => item.upper_message_id === messageId);
+            return { ...parent, children };
         }
         catch (e) {
             console.error(`[LARK-MSG] Failed to get message ${messageId}:`, e.message);

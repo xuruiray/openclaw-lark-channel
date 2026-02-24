@@ -161,10 +161,17 @@ export class LarkClient {
     msg_type?: string;
     body?: { content?: string };
     sender?: { id?: string; sender_type?: string };
+    children?: Array<{ msg_type?: string; body?: { content?: string }; message_id?: string }>;
   } | null> {
     try {
       const res = await this.sdk.im.v1.message.get({ path: { message_id: messageId } });
-      return (res?.data?.items?.[0] ?? res?.data) as any ?? null;
+      const items: any[] = (res?.data as any)?.items ?? [];
+      if (items.length === 0) return null;
+      const parent = items[0];
+      const children = items.slice(1).filter(
+        (item: any) => item.upper_message_id === messageId
+      );
+      return { ...parent, children };
     } catch (e) {
       console.error(`[LARK-MSG] Failed to get message ${messageId}:`, (e as Error).message);
       return null;

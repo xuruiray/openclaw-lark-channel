@@ -498,21 +498,15 @@ export class WebhookHandler {
                 }
                 case 'merge_forward': {
                     try {
-                        const content = JSON.parse(message.content ?? '{}');
-                        const ids = content.message_ids ?? [];
-                        if (ids.length === 0) {
-                            text = '[User forwarded messages (empty)]';
+                        const parentMsg = await this.config.client.getMessage(messageId);
+                        if (!parentMsg || !parentMsg.children || parentMsg.children.length === 0) {
+                            text = '[User forwarded messages]';
                             break;
                         }
                         const parts = [];
-                        for (const id of ids.slice(0, 20)) {
-                            const msg = await this.config.client.getMessage(id);
-                            if (!msg) {
-                                parts.push(`[message ${id}: fetch failed]`);
-                                continue;
-                            }
-                            const type = msg.msg_type ?? 'unknown';
-                            const body = msg.body?.content ?? '';
+                        for (const child of parentMsg.children.slice(0, 20)) {
+                            const type = child.msg_type ?? 'unknown';
+                            const body = child.body?.content ?? '';
                             if (type === 'text') {
                                 try {
                                     parts.push(JSON.parse(body).text ?? body);
@@ -529,12 +523,13 @@ export class WebhookHandler {
                                 parts.push(`[${type} message]`);
                             }
                         }
-                        const truncNote = ids.length > 20 ? `\n... and ${ids.length - 20} more messages` : '';
-                        text = `[Forwarded ${ids.length} messages]\n${parts.join('\n')}${truncNote}`;
+                        const count = parentMsg.children.length;
+                        const truncNote = count > 20 ? `\n... and ${count - 20} more messages` : '';
+                        text = `[Forwarded ${count} messages]\n${parts.join('\n')}${truncNote}`;
                     }
                     catch (e) {
-                        console.error('[WEBHOOK] merge_forward parse error:', e.message);
-                        text = '[User forwarded messages (parse error)]';
+                        console.error('[WEBHOOK] merge_forward error:', e.message);
+                        text = '[User forwarded messages]';
                     }
                     break;
                 }

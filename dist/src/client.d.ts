@@ -32,6 +32,13 @@ export declare class LarkClient {
             id?: string;
             sender_type?: string;
         };
+        children?: Array<{
+            msg_type?: string;
+            body?: {
+                content?: string;
+            };
+            message_id?: string;
+        }>;
     } | null>;
     /**
      * Send a text message
