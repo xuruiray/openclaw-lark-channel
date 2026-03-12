@@ -336,9 +336,12 @@ async function processInboundQueueInner(queue) {
             }
             // Build context like Telegram does - THIS IS THE KEY
             // Include MediaPath/MediaPaths for file attachments (following Telegram pattern)
+            const senderOpenId = (msg.session_key || '').split(':')[2] || msg.chat_id;
+            const bodyWithSender = `[sender: ${senderOpenId}]
+${msg.message_text}`;
             const ctx = pluginRuntime.channel.reply.finalizeInboundContext({
                 Body: msg.message_text,
-                BodyForAgent: msg.message_text,
+                BodyForAgent: bodyWithSender,
                 BodyForCommands: msg.message_text,
                 RawBody: msg.message_text,
                 CommandBody: msg.message_text,
