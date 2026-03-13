@@ -696,7 +696,7 @@ export class WebhookHandler {
         notifyInboundEnqueued();
 
         // Add "GET" reaction immediately to acknowledge receipt
-        this.config.client.addReaction(messageId, 'OK').catch(() => {
+        this.config.client.addReaction(messageId, 'KEYBOARD').catch(() => {
           // Non-critical — don't block message processing
         });
       } else {
