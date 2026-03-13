@@ -589,7 +589,7 @@ export class WebhookHandler {
                 console.log(`[WEBHOOK] ✅ Queued message ${messageId}`);
                 notifyInboundEnqueued();
                 // Add "GET" reaction immediately to acknowledge receipt
-                this.config.client.addReaction(messageId, 'KEYBOARD').catch(() => {
+                this.config.client.addReaction(messageId, 'DONE').catch(() => {
                     // Non-critical — don't block message processing
                 });
             }
