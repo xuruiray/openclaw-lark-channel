@@ -502,6 +502,48 @@ export class LarkClient {
     return { texts, imageKeys };
   }
 
+  // ─── Reactions ─────────────────────────────────────────────────
+
+  /**
+   * Add an emoji reaction to a message
+   * @see https://open.feishu.cn/document/server-docs/im-v1/message-reaction/create
+   */
+  async addReaction(messageId: string, emojiType: string = 'OK'): Promise<boolean> {
+    try {
+      const token = await this.getTenantToken();
+      if (!token) return false;
+
+      const domain = this.domain === 'feishu'
+        ? 'https://open.feishu.cn'
+        : 'https://open.larksuite.com';
+
+      const res = await fetch(
+        `${domain}/open-apis/im/v1/messages/${messageId}/reactions`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reaction_type: { emoji_type: emojiType },
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const body = await res.text();
+        console.error(`[LARK-REACTION] Failed (${res.status}): ${body}`);
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      console.error('[LARK-REACTION]', (e as Error).message);
+      return false;
+    }
+  }
+
   // ─── Getters ───────────────────────────────────────────────────
 
   get client(): LarkSDK.Client {

@@ -92,6 +92,11 @@ export declare class LarkClient {
      * Parse post (rich text) content
      */
     parsePostContent(content: string | object): ParsedPostContent;
+    /**
+     * Add an emoji reaction to a message
+     * @see https://open.feishu.cn/document/server-docs/im-v1/message-reaction/create
+     */
+    addReaction(messageId: string, emojiType?: string): Promise<boolean>;
     get client(): LarkSDK.Client;
 }
 export declare function getLarkClient(accountId?: string): LarkClient;

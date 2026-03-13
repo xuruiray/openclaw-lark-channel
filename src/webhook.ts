@@ -694,6 +694,11 @@ export class WebhookHandler {
       if (result.enqueued) {
         console.log(`[WEBHOOK] ✅ Queued message ${messageId}`);
         notifyInboundEnqueued();
+
+        // Add "GET" reaction immediately to acknowledge receipt
+        this.config.client.addReaction(messageId, 'GET').catch(() => {
+          // Non-critical — don't block message processing
+        });
       } else {
         console.log(`[WEBHOOK] ⏭️ Skipped: ${result.reason}`);
       }

@@ -585,7 +585,7 @@ export const larkPlugin = {
     },
     capabilities: {
         chatTypes: ['direct', 'group'],
-        reactions: false,
+        reactions: true,
         threads: false,
         media: true,
         nativeCommands: false,
