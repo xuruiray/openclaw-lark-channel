@@ -16,6 +16,7 @@ export declare class LarkClient {
     private domain;
     private tokenCache;
     private imageCacheDir;
+    private chatModeCache;
     constructor(params: {
         appId: string;
         appSecret: string;
@@ -43,11 +44,11 @@ export declare class LarkClient {
     /**
      * Send a text message
      */
-    sendText(chatId: string, text: string, rootId?: string | null): Promise<LarkSendResult>;
+    sendText(chatId: string, text: string): Promise<LarkSendResult>;
     /**
      * Send an interactive card message
      */
-    sendCard(chatId: string, card: LarkCard, rootId?: string | null): Promise<LarkSendResult>;
+    sendCard(chatId: string, card: LarkCard): Promise<LarkSendResult>;
     /**
      * Send a post (rich text) message
      */
@@ -97,6 +98,16 @@ export declare class LarkClient {
      * @see https://open.feishu.cn/document/server-docs/im-v1/message-reaction/create
      */
     addReaction(messageId: string, emojiType?: string): Promise<boolean>;
+    /**
+     * Reply to a specific message (used for topic groups and thread replies).
+     * Uses im.v1.message.reply API which nests the reply under the target message.
+     */
+    replyToMessage(messageId: string, content: string, msgType: 'text' | 'interactive'): Promise<LarkSendResult>;
+    /**
+     * Get chat mode for a chat ID (cached for 1 hour).
+     * Returns 'topic' for topic groups, 'group' for regular groups, 'p2p' for DMs.
+     */
+    getChatMode(chatId: string): Promise<string>;
     get client(): LarkSDK.Client;
 }
 export declare function getLarkClient(accountId?: string): LarkClient;

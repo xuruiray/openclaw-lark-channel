@@ -387,7 +387,8 @@ ${msg.message_text}`;
             const client = getLarkClient();
             console.log(`[INBOUND] Starting dispatch for message: "${msg.message_text.substring(0, 50)}..." | images: ${images.length}`);
             console.log(`[INBOUND] Context: SessionKey=${route.sessionKey}, ChatId=${msg.chat_id}, RootId=${msg.root_id ?? 'none'}, Surface=${ctx.Surface}`);
-            const rootId = msg.root_id || msg.message_id;
+            const replyToId = msg.root_id ?? null;
+            const messageId = msg.message_id;
             const DISPATCH_TIMEOUT_MS = 300_000;
             let deliverCallCount = 0;
             let lastDeliveryKind = '';
@@ -405,7 +406,7 @@ ${msg.message_text}`;
                             return;
                         }
                         console.log(`[DISPATCH] Delivering ${info.kind}: ${text.length} chars to ${msg.chat_id}`);
-                        await sendToLark(client, msg.chat_id, text, route.sessionKey, rootId);
+                        await sendToLark(client, msg.chat_id, text, route.sessionKey, replyToId, messageId);
                         console.log(`[DISPATCH] ✅ Sent ${info.kind} to Lark`);
                     },
                     onError: (err, info) => {
@@ -523,7 +524,7 @@ function calculateSendBackoff(attempt) {
     const backoff = SEND_RETRY_BASE_MS * Math.pow(2, Math.min(attempt - 1, 17));
     return Math.min(backoff, SEND_RETRY_MAX_MS);
 }
-async function sendToLarkWithRetry(client, chatId, content, sessionKey, rootId) {
+async function sendToLarkWithRetry(client, chatId, content, sessionKey, replyToId, messageId) {
     const msgType = selectMessageType(content);
     if (msgType === 'skip') {
         return { skipped: true };
@@ -541,12 +542,34 @@ async function sendToLarkWithRetry(client, chatId, content, sessionKey, rootId) 
     for (let attempt = 1; attempt <= SEND_MAX_RETRIES; attempt++) {
         try {
             let result;
-            if (msgType === 'text') {
-                result = await client.sendText(chatId, content, rootId);
+            if (replyToId) {
+                // Reply within topic/thread
+                const replyContent = msgType === 'text'
+                    ? JSON.stringify({ text: content })
+                    : JSON.stringify(buildCard({ text: content, sessionKey }));
+                result = await client.replyToMessage(replyToId, replyContent, msgType);
+            }
+            else if (messageId) {
+                // No root_id but have messageId — check if topic group (need reply to self)
+                const chatMode = await client.getChatMode(chatId);
+                if (chatMode === 'topic') {
+                    const replyContent = msgType === 'text'
+                        ? JSON.stringify({ text: content })
+                        : JSON.stringify(buildCard({ text: content, sessionKey }));
+                    result = await client.replyToMessage(messageId, replyContent, msgType);
+                }
+                else if (msgType === 'text') {
+                    result = await client.sendText(chatId, content);
+                }
+                else {
+                    result = await client.sendCard(chatId, buildCard({ text: content, sessionKey }));
+                }
+            }
+            else if (msgType === 'text') {
+                result = await client.sendText(chatId, content);
             }
             else {
-                const card = buildCard({ text: content, sessionKey });
-                result = await client.sendCard(chatId, card, rootId);
+                result = await client.sendCard(chatId, buildCard({ text: content, sessionKey }));
             }
             if (result.success) {
                 console.log(`[LARK-SENT] ${msgType}: ${result.messageId}${attempt > 1 ? ` (attempt ${attempt})` : ''}`);

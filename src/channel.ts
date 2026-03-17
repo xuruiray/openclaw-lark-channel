@@ -463,7 +463,8 @@ ${msg.message_text}`;
 
       console.log(`[INBOUND] Starting dispatch for message: "${msg.message_text.substring(0, 50)}..." | images: ${images.length}`);
       console.log(`[INBOUND] Context: SessionKey=${route.sessionKey}, ChatId=${msg.chat_id}, RootId=${msg.root_id ?? 'none'}, Surface=${ctx.Surface}`);
-      const rootId = msg.root_id || msg.message_id;
+      const replyToId = msg.root_id ?? null;
+      const messageId = msg.message_id;
       
       const DISPATCH_TIMEOUT_MS = 300_000;
       let deliverCallCount = 0;
@@ -485,7 +486,7 @@ ${msg.message_text}`;
             }
 
             console.log(`[DISPATCH] Delivering ${info.kind}: ${text.length} chars to ${msg.chat_id}`);
-            await sendToLark(client, msg.chat_id, text, route.sessionKey, rootId);
+            await sendToLark(client, msg.chat_id, text, route.sessionKey, replyToId, messageId);
             console.log(`[DISPATCH] ✅ Sent ${info.kind} to Lark`);
           },
           onError: (err, info) => {
@@ -637,7 +638,8 @@ async function sendToLarkWithRetry(
   chatId: string,
   content: string,
   sessionKey?: string,
-  rootId?: string | null
+  replyToId?: string | null,
+  messageId?: string | null
 ): Promise<{ skipped?: boolean; messageId?: string; error?: string }> {
   const msgType = selectMessageType(content);
 
@@ -661,11 +663,29 @@ async function sendToLarkWithRetry(
     try {
       let result: { success: boolean; messageId?: string; error?: string };
 
-      if (msgType === 'text') {
-        result = await client.sendText(chatId, content, rootId);
+      if (replyToId) {
+        // Reply within topic/thread
+        const replyContent = msgType === 'text'
+          ? JSON.stringify({ text: content })
+          : JSON.stringify(buildCard({ text: content, sessionKey }));
+        result = await client.replyToMessage(replyToId, replyContent, msgType);
+      } else if (messageId) {
+        // No root_id but have messageId — check if topic group (need reply to self)
+        const chatMode = await client.getChatMode(chatId);
+        if (chatMode === 'topic') {
+          const replyContent = msgType === 'text'
+            ? JSON.stringify({ text: content })
+            : JSON.stringify(buildCard({ text: content, sessionKey }));
+          result = await client.replyToMessage(messageId, replyContent, msgType);
+        } else if (msgType === 'text') {
+          result = await client.sendText(chatId, content);
+        } else {
+          result = await client.sendCard(chatId, buildCard({ text: content, sessionKey }));
+        }
+      } else if (msgType === 'text') {
+        result = await client.sendText(chatId, content);
       } else {
-        const card = buildCard({ text: content, sessionKey });
-        result = await client.sendCard(chatId, card, rootId);
+        result = await client.sendCard(chatId, buildCard({ text: content, sessionKey }));
       }
 
       if (result.success) {

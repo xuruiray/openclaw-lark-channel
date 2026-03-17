@@ -18,6 +18,7 @@ export class LarkClient {
     domain;
     tokenCache = { token: null, expireTime: 0 };
     imageCacheDir;
+    chatModeCache = new Map();
     constructor(params) {
         this.appId = params.appId;
         this.appSecret = params.appSecret;
@@ -125,18 +126,15 @@ export class LarkClient {
     /**
      * Send a text message
      */
-    async sendText(chatId, text, rootId) {
+    async sendText(chatId, text) {
         try {
-            const data = {
-                receive_id: chatId,
-                msg_type: 'text',
-                content: JSON.stringify({ text }),
-            };
-            if (rootId)
-                data.root_id = rootId;
             const res = await this.sdk.im.v1.message.create({
                 params: { receive_id_type: 'chat_id' },
-                data: data,
+                data: {
+                    receive_id: chatId,
+                    msg_type: 'text',
+                    content: JSON.stringify({ text }),
+                },
             });
             if (res?.data?.message_id) {
                 return { success: true, messageId: res.data.message_id };
@@ -150,18 +148,15 @@ export class LarkClient {
     /**
      * Send an interactive card message
      */
-    async sendCard(chatId, card, rootId) {
+    async sendCard(chatId, card) {
         try {
-            const data = {
-                receive_id: chatId,
-                msg_type: 'interactive',
-                content: JSON.stringify(card),
-            };
-            if (rootId)
-                data.root_id = rootId;
             const res = await this.sdk.im.v1.message.create({
                 params: { receive_id_type: 'chat_id' },
-                data: data,
+                data: {
+                    receive_id: chatId,
+                    msg_type: 'interactive',
+                    content: JSON.stringify(card),
+                },
             });
             if (res?.data?.message_id) {
                 return { success: true, messageId: res.data.message_id };
@@ -443,6 +438,59 @@ export class LarkClient {
         catch (e) {
             console.error('[LARK-REACTION]', e.message);
             return false;
+        }
+    }
+    // ─── Topic / Thread Support ────────────────────────────────────
+    /**
+     * Reply to a specific message (used for topic groups and thread replies).
+     * Uses im.v1.message.reply API which nests the reply under the target message.
+     */
+    async replyToMessage(messageId, content, msgType) {
+        try {
+            const res = await this.sdk.im.v1.message.reply({
+                path: { message_id: messageId },
+                data: {
+                    msg_type: msgType,
+                    content,
+                },
+            });
+            if (res?.data?.message_id) {
+                return { success: true, messageId: res.data.message_id };
+            }
+            return { success: false, error: 'No message_id in reply response' };
+        }
+        catch (e) {
+            return { success: false, error: e.message };
+        }
+    }
+    /**
+     * Get chat mode for a chat ID (cached for 1 hour).
+     * Returns 'topic' for topic groups, 'group' for regular groups, 'p2p' for DMs.
+     */
+    async getChatMode(chatId) {
+        const cached = this.chatModeCache.get(chatId);
+        if (cached && Date.now() - cached.ts < 3600_000) {
+            return cached.mode;
+        }
+        try {
+            const token = await this.getTenantToken();
+            if (!token)
+                return 'unknown';
+            const domain = this.domain === 'feishu'
+                ? 'https://open.feishu.cn'
+                : 'https://open.larksuite.com';
+            const res = await fetch(`${domain}/open-apis/im/v1/chats/${chatId}`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const data = await res.json();
+            const mode = data?.data?.chat_mode ?? 'unknown';
+            this.chatModeCache.set(chatId, { mode, ts: Date.now() });
+            console.log(`[LARK-CHAT] Chat ${chatId} mode=${mode}`);
+            return mode;
+        }
+        catch (e) {
+            console.error('[LARK-CHAT] getChatMode error:', e.message);
+            return 'unknown';
         }
     }
     // ─── Getters ───────────────────────────────────────────────────

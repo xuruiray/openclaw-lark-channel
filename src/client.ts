@@ -30,6 +30,7 @@ export class LarkClient {
   private domain: 'lark' | 'feishu';
   private tokenCache: LarkTokenCache = { token: null, expireTime: 0 };
   private imageCacheDir: string;
+  private chatModeCache: Map<string, { mode: string; ts: number }> = new Map();
 
   constructor(params: {
     appId: string;
@@ -183,17 +184,15 @@ export class LarkClient {
   /**
    * Send a text message
    */
-  async sendText(chatId: string, text: string, rootId?: string | null): Promise<LarkSendResult> {
+  async sendText(chatId: string, text: string): Promise<LarkSendResult> {
     try {
-      const data: Record<string, unknown> = {
-        receive_id: chatId,
-        msg_type: 'text',
-        content: JSON.stringify({ text }),
-      };
-      if (rootId) data.root_id = rootId;
       const res = await this.sdk.im.v1.message.create({
         params: { receive_id_type: 'chat_id' },
-        data: data as any,
+        data: {
+          receive_id: chatId,
+          msg_type: 'text',
+          content: JSON.stringify({ text }),
+        },
       });
 
       if (res?.data?.message_id) {
@@ -209,17 +208,15 @@ export class LarkClient {
   /**
    * Send an interactive card message
    */
-  async sendCard(chatId: string, card: LarkCard, rootId?: string | null): Promise<LarkSendResult> {
+  async sendCard(chatId: string, card: LarkCard): Promise<LarkSendResult> {
     try {
-      const data: Record<string, unknown> = {
-        receive_id: chatId,
-        msg_type: 'interactive',
-        content: JSON.stringify(card),
-      };
-      if (rootId) data.root_id = rootId;
       const res = await this.sdk.im.v1.message.create({
         params: { receive_id_type: 'chat_id' },
-        data: data as any,
+        data: {
+          receive_id: chatId,
+          msg_type: 'interactive',
+          content: JSON.stringify(card),
+        },
       });
 
       if (res?.data?.message_id) {
@@ -545,6 +542,69 @@ export class LarkClient {
     } catch (e) {
       console.error('[LARK-REACTION]', (e as Error).message);
       return false;
+    }
+  }
+
+  // ─── Topic / Thread Support ────────────────────────────────────
+
+  /**
+   * Reply to a specific message (used for topic groups and thread replies).
+   * Uses im.v1.message.reply API which nests the reply under the target message.
+   */
+  async replyToMessage(messageId: string, content: string, msgType: 'text' | 'interactive'): Promise<LarkSendResult> {
+    try {
+      const res = await this.sdk.im.v1.message.reply({
+        path: { message_id: messageId },
+        data: {
+          msg_type: msgType,
+          content,
+        },
+      });
+
+      if ((res as any)?.data?.message_id) {
+        return { success: true, messageId: (res as any).data.message_id };
+      }
+
+      return { success: false, error: 'No message_id in reply response' };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  }
+
+  /**
+   * Get chat mode for a chat ID (cached for 1 hour).
+   * Returns 'topic' for topic groups, 'group' for regular groups, 'p2p' for DMs.
+   */
+  async getChatMode(chatId: string): Promise<string> {
+    const cached = this.chatModeCache.get(chatId);
+    if (cached && Date.now() - cached.ts < 3600_000) {
+      return cached.mode;
+    }
+
+    try {
+      const token = await this.getTenantToken();
+      if (!token) return 'unknown';
+
+      const domain = this.domain === 'feishu'
+        ? 'https://open.feishu.cn'
+        : 'https://open.larksuite.com';
+
+      const res = await fetch(`${domain}/open-apis/im/v1/chats/${chatId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const data = await res.json() as {
+        code?: number;
+        data?: { chat_mode?: string };
+      };
+
+      const mode = data?.data?.chat_mode ?? 'unknown';
+      this.chatModeCache.set(chatId, { mode, ts: Date.now() });
+      console.log(`[LARK-CHAT] Chat ${chatId} mode=${mode}`);
+      return mode;
+    } catch (e) {
+      console.error('[LARK-CHAT] getChatMode error:', (e as Error).message);
+      return 'unknown';
     }
   }
 
