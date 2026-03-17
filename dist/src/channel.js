@@ -387,7 +387,7 @@ ${msg.message_text}`;
             const client = getLarkClient();
             console.log(`[INBOUND] Starting dispatch for message: "${msg.message_text.substring(0, 50)}..." | images: ${images.length}`);
             console.log(`[INBOUND] Context: SessionKey=${route.sessionKey}, ChatId=${msg.chat_id}, RootId=${msg.root_id ?? 'none'}, Surface=${ctx.Surface}`);
-            const rootId = msg.root_id ?? null;
+            const rootId = msg.root_id || msg.message_id;
             const DISPATCH_TIMEOUT_MS = 300_000;
             let deliverCallCount = 0;
             let lastDeliveryKind = '';
