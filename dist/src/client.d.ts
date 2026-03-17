@@ -43,11 +43,11 @@ export declare class LarkClient {
     /**
      * Send a text message
      */
-    sendText(chatId: string, text: string): Promise<LarkSendResult>;
+    sendText(chatId: string, text: string, rootId?: string | null): Promise<LarkSendResult>;
     /**
      * Send an interactive card message
      */
-    sendCard(chatId: string, card: LarkCard): Promise<LarkSendResult>;
+    sendCard(chatId: string, card: LarkCard, rootId?: string | null): Promise<LarkSendResult>;
     /**
      * Send a post (rich text) message
      */

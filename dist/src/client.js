@@ -125,15 +125,18 @@ export class LarkClient {
     /**
      * Send a text message
      */
-    async sendText(chatId, text) {
+    async sendText(chatId, text, rootId) {
         try {
+            const data = {
+                receive_id: chatId,
+                msg_type: 'text',
+                content: JSON.stringify({ text }),
+            };
+            if (rootId)
+                data.root_id = rootId;
             const res = await this.sdk.im.v1.message.create({
                 params: { receive_id_type: 'chat_id' },
-                data: {
-                    receive_id: chatId,
-                    msg_type: 'text',
-                    content: JSON.stringify({ text }),
-                },
+                data: data,
             });
             if (res?.data?.message_id) {
                 return { success: true, messageId: res.data.message_id };
@@ -147,15 +150,18 @@ export class LarkClient {
     /**
      * Send an interactive card message
      */
-    async sendCard(chatId, card) {
+    async sendCard(chatId, card, rootId) {
         try {
+            const data = {
+                receive_id: chatId,
+                msg_type: 'interactive',
+                content: JSON.stringify(card),
+            };
+            if (rootId)
+                data.root_id = rootId;
             const res = await this.sdk.im.v1.message.create({
                 params: { receive_id_type: 'chat_id' },
-                data: {
-                    receive_id: chatId,
-                    msg_type: 'interactive',
-                    content: JSON.stringify(card),
-                },
+                data: data,
             });
             if (res?.data?.message_id) {
                 return { success: true, messageId: res.data.message_id };

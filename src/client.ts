@@ -183,15 +183,17 @@ export class LarkClient {
   /**
    * Send a text message
    */
-  async sendText(chatId: string, text: string): Promise<LarkSendResult> {
+  async sendText(chatId: string, text: string, rootId?: string | null): Promise<LarkSendResult> {
     try {
+      const data: Record<string, unknown> = {
+        receive_id: chatId,
+        msg_type: 'text',
+        content: JSON.stringify({ text }),
+      };
+      if (rootId) data.root_id = rootId;
       const res = await this.sdk.im.v1.message.create({
         params: { receive_id_type: 'chat_id' },
-        data: {
-          receive_id: chatId,
-          msg_type: 'text',
-          content: JSON.stringify({ text }),
-        },
+        data: data as any,
       });
 
       if (res?.data?.message_id) {
@@ -207,15 +209,17 @@ export class LarkClient {
   /**
    * Send an interactive card message
    */
-  async sendCard(chatId: string, card: LarkCard): Promise<LarkSendResult> {
+  async sendCard(chatId: string, card: LarkCard, rootId?: string | null): Promise<LarkSendResult> {
     try {
+      const data: Record<string, unknown> = {
+        receive_id: chatId,
+        msg_type: 'interactive',
+        content: JSON.stringify(card),
+      };
+      if (rootId) data.root_id = rootId;
       const res = await this.sdk.im.v1.message.create({
         params: { receive_id_type: 'chat_id' },
-        data: {
-          receive_id: chatId,
-          msg_type: 'interactive',
-          content: JSON.stringify(card),
-        },
+        data: data as any,
       });
 
       if (res?.data?.message_id) {

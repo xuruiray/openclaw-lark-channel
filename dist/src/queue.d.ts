@@ -32,6 +32,7 @@ export declare class MessageQueue {
     private stmtCheckInboundExists;
     constructor(dbPath?: string);
     private initializeSchema;
+    private migrateSchema;
     /**
      * Reset any messages that were in 'processing' state when the service stopped.
      * This prevents messages from getting stuck after a restart.
@@ -72,6 +73,7 @@ export declare class MessageQueue {
     enqueueInbound(params: {
         messageId: string;
         chatId: string;
+        rootId?: string | null;
         sessionKey: string;
         messageText: string;
         attachments?: Attachment[] | null;

@@ -681,11 +681,13 @@ export class WebhookHandler {
       const senderOpenId = event.sender?.sender_id?.open_id || '';
       const sessionKey = `lark:${chatId}:${senderOpenId}`;
       const messageText = text || '[User sent an image]';
+      const rootId = message?.root_id || null;
 
       // ⚡ PERSIST IMMEDIATELY - no message loss
       const result = this.config.queue.enqueueInbound({
         messageId,
         chatId,
+        rootId,
         sessionKey,
         messageText,
         attachments: attachments.length > 0 ? attachments : null,

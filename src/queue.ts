@@ -81,6 +81,7 @@ export class MessageQueue {
     this.db.pragma('synchronous = NORMAL');
 
     this.initializeSchema();
+    this.migrateSchema();
     this.resetStuckMessages();
 
     // Initialize prepared statements
@@ -128,8 +129,8 @@ export class MessageQueue {
 
     this.stmtEnqueueInbound = this.db.prepare(`
       INSERT OR IGNORE INTO inbound_queue 
-        (message_id, chat_id, session_key, message_text, attachments_json, status, created_at, updated_at, next_retry_at)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+        (message_id, chat_id, root_id, session_key, message_text, attachments_json, status, created_at, updated_at, next_retry_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
     `);
 
     this.stmtDequeueInbound = this.db.prepare(`
@@ -191,6 +192,7 @@ export class MessageQueue {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         message_id TEXT NOT NULL UNIQUE,  -- Lark message_id for dedup
         chat_id TEXT NOT NULL,
+        root_id TEXT,                     -- Topic root message ID (for topic group replies)
         session_key TEXT NOT NULL,
         message_text TEXT NOT NULL,
         attachments_json TEXT,            -- JSON array of attachments
@@ -218,6 +220,15 @@ export class MessageQueue {
       
       CREATE INDEX IF NOT EXISTS idx_sent_hash ON sent_messages(content_hash, chat_id, created_at);
     `);
+  }
+
+  private migrateSchema(): void {
+    // Add root_id column to inbound_queue if it does not exist (topic group support)
+    const cols = this.db.prepare("PRAGMA table_info(inbound_queue)").all() as Array<{ name: string }>;
+    if (!cols.some(c => c.name === 'root_id')) {
+      this.db.exec("ALTER TABLE inbound_queue ADD COLUMN root_id TEXT");
+      console.log('[QUEUE] Migration: added root_id column to inbound_queue');
+    }
   }
 
   /**
@@ -390,6 +401,7 @@ export class MessageQueue {
   enqueueInbound(params: {
     messageId: string;
     chatId: string;
+    rootId?: string | null;
     sessionKey: string;
     messageText: string;
     attachments?: Attachment[] | null;
@@ -406,6 +418,7 @@ export class MessageQueue {
     const result = this.stmtEnqueueInbound.run(
       params.messageId,
       params.chatId,
+      params.rootId ?? null,
       params.sessionKey,
       params.messageText,
       attachmentsJson,

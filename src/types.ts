@@ -66,6 +66,7 @@ export interface QueueMessage {
 export interface InboundMessage extends QueueMessage {
   message_id: string;
   chat_id: string;
+  root_id: string | null;
   session_key: string;
   message_text: string;
   attachments_json: string | null;
