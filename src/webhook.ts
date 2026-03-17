@@ -668,9 +668,14 @@ export class WebhookHandler {
 
         text = text.replace(/@_user_\d+\s*/g, '').trim();
 
-        const requireMention = this.config.groupRequireMention ?? true;
-        if (attachments.length === 0 && !shouldRespondInGroup(text, mentions, requireMention)) {
-          return;
+        // Skip mention requirement for messages in a thread/topic —
+        // the user is already in a conversation context with the bot
+        const isInThread = !!message?.root_id;
+        if (!isInThread) {
+          const requireMention = this.config.groupRequireMention ?? true;
+          if (attachments.length === 0 && !shouldRespondInGroup(text, mentions, requireMention)) {
+            return;
+          }
         }
       }
 
